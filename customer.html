@@ -1,0 +1,609 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BillFlow — ส่งงาน</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="config.js"></script>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: 'Segoe UI', Tahoma, sans-serif; background: #f0fdf4; color: #1e293b; }
+
+.navbar {
+  background: linear-gradient(135deg, #0f766e, #134e4a);
+  padding: 0 20px; display: flex; align-items: center; justify-content: space-between;
+  height: 56px; position: sticky; top: 0; z-index: 100;
+  box-shadow: 0 2px 8px rgba(0,0,0,.2);
+}
+.navbar .brand { color: white; font-size: 18px; font-weight: 700; display: flex; align-items: center; gap: 8px; }
+.navbar .user-info { color: rgba(255,255,255,.85); font-size: 13px; display: flex; align-items: center; gap: 12px; }
+.btn-logout {
+  background: rgba(255,255,255,.15); border: 1px solid rgba(255,255,255,.3);
+  color: white; padding: 5px 14px; border-radius: 8px; font-size: 13px; cursor: pointer;
+}
+.btn-logout:hover { background: rgba(255,255,255,.25); }
+
+.tab-nav {
+  display: flex; background: white; border-bottom: 2px solid #e2e8f0; padding: 0 20px;
+  overflow-x: auto;
+}
+.tab-nav button {
+  padding: 14px 20px; border: none; background: none;
+  font-size: 14px; font-weight: 600; cursor: pointer;
+  color: #64748b; border-bottom: 3px solid transparent;
+  white-space: nowrap; transition: all .2s; margin-bottom: -2px;
+}
+.tab-nav button.active { color: #0f766e; border-bottom-color: #0f766e; }
+
+.main { max-width: 760px; margin: 0 auto; padding: 20px; }
+.tab-content { display: none; }
+.tab-content.active { display: block; }
+
+.card {
+  background: white; border-radius: 12px; border: 1px solid #e2e8f0;
+  padding: 20px; margin-bottom: 16px; box-shadow: 0 1px 3px rgba(0,0,0,.06);
+}
+.card-header {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-bottom: 16px; padding-bottom: 12px; border-bottom: 1px solid #f1f5f9;
+}
+.card-title { font-size: 16px; font-weight: 700; color: #134e4a; }
+
+/* Buttons */
+.btn {
+  padding: 9px 18px; border: none; border-radius: 8px;
+  font-size: 13px; font-weight: 600; cursor: pointer; transition: all .2s;
+}
+.btn-primary { background: #0f766e; color: white; }
+.btn-primary:hover { background: #0d6b63; }
+.btn-outline { background: white; color: #374151; border: 1.5px solid #d1d5db; }
+.btn-outline:hover { background: #f9fafb; }
+.btn-ghost { background: none; border: 1px dashed #cbd5e1; color: #64748b; }
+.btn-ghost:hover { background: #f1f5f9; }
+.btn-danger { background: none; border: none; color: #dc2626; font-size: 12px; cursor: pointer; padding: 2px 6px; }
+.btn-sm { padding: 5px 12px; font-size: 12px; }
+.btn:disabled { opacity: .5; cursor: not-allowed; }
+
+/* Form */
+label { display: block; font-size: 13px; font-weight: 600; color: #374151; margin-bottom: 6px; }
+input, select, textarea {
+  width: 100%; padding: 9px 12px; border: 1.5px solid #d1d5db; border-radius: 8px;
+  font-size: 14px; color: #1e293b; font-family: inherit;
+  transition: border-color .2s;
+}
+input:focus, select:focus, textarea:focus { outline: none; border-color: #14b8a6; }
+textarea { resize: vertical; min-height: 70px; }
+
+/* Company / Project blocks */
+.co-section {
+  background: #f8fffe; border: 1.5px solid #99f6e4; border-radius: 12px;
+  padding: 16px; margin-bottom: 16px;
+}
+.co-header {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-bottom: 14px;
+}
+.co-label { font-weight: 700; color: #0f766e; font-size: 15px; }
+.proj-block {
+  background: white; border: 1px solid #e2e8f0; border-radius: 8px;
+  padding: 12px; margin-bottom: 10px;
+}
+.proj-block-header {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-bottom: 10px; font-size: 13px; font-weight: 600; color: #64748b;
+}
+.input-row { display: grid; grid-template-columns: 1fr auto; gap: 10px; }
+.amount-input { width: 140px !important; }
+
+.add-company-btn {
+  width: 100%; padding: 14px; border: 2px dashed #14b8a6;
+  border-radius: 12px; background: none; color: #0f766e;
+  font-size: 15px; font-weight: 700; cursor: pointer;
+  transition: all .2s; margin-bottom: 16px;
+}
+.add-company-btn:hover { background: #f0fdfa; border-color: #0f766e; }
+
+/* Status badges */
+.badge {
+  display: inline-block; padding: 3px 10px; border-radius: 20px;
+  font-size: 11px; font-weight: 700;
+}
+.badge-pending { background: #fef9c3; color: #854d0e; }
+.badge-docs    { background: #dbeafe; color: #1d4ed8; }
+.badge-paid    { background: #dcfce7; color: #15803d; }
+
+/* Lot cards in tracking */
+.lot-card {
+  border: 1px solid #e2e8f0; border-radius: 12px; padding: 16px;
+  margin-bottom: 12px; background: white;
+}
+.lot-card-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px; }
+.lot-number { font-size: 16px; font-weight: 700; color: #134e4a; }
+.lot-meta   { font-size: 12px; color: #94a3b8; margin-top: 2px; }
+
+/* File upload */
+.upload-zone {
+  border: 2px dashed #99f6e4; border-radius: 10px; padding: 24px;
+  text-align: center; cursor: pointer; background: #f0fdfa;
+  transition: all .2s; color: #0f766e;
+}
+.upload-zone:hover { background: #ccfbf1; border-color: #14b8a6; }
+.upload-zone input[type=file] { display: none; }
+
+/* Toast */
+.toast {
+  position: fixed; bottom: 20px; right: 20px;
+  background: #134e4a; color: white; padding: 12px 20px;
+  border-radius: 10px; font-size: 14px; font-weight: 600;
+  z-index: 300; display: none; box-shadow: 0 4px 20px rgba(0,0,0,.2);
+  animation: slideIn .3s ease;
+}
+@keyframes slideIn { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+
+.empty { text-align: center; padding: 40px; color: #94a3b8; }
+.empty-icon { font-size: 40px; margin-bottom: 10px; }
+.loading-spinner { display: inline-block; width: 20px; height: 20px; border: 2px solid #e2e8f0; border-top-color: #0f766e; border-radius: 50%; animation: spin .6s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+</style>
+</head>
+<body>
+
+<!-- Navbar -->
+<div class="navbar">
+  <div class="brand">📋 BillFlow</div>
+  <div class="user-info">
+    <span id="cust-email"></span>
+    <button class="btn-logout" onclick="logout()">ออกจากระบบ</button>
+  </div>
+</div>
+
+<!-- Tab Nav -->
+<div class="tab-nav">
+  <button class="active" onclick="switchTab(0)">📤 ส่งงาน</button>
+  <button onclick="switchTab(1)">📊 ติดตามสถานะ</button>
+  <button onclick="switchTab(2)">🧾 แนบสลิป</button>
+</div>
+
+<div class="main">
+
+  <!-- ===== TAB 0: ส่งงาน ===== -->
+  <div class="tab-content active" id="tab-0">
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title">📤 ส่งงานใหม่</div>
+      </div>
+
+      <!-- เลือก Lot -->
+      <div style="margin-bottom:20px">
+        <label>Lot ที่ต้องการส่งงาน *</label>
+        <select id="submit-lot-select">
+          <option value="">กำลังโหลด...</option>
+        </select>
+        <p style="font-size:12px;color:#94a3b8;margin-top:6px">Lot ถูกสร้างโดย Admin ก่อนที่จะส่งงานได้</p>
+      </div>
+
+      <!-- รายละเอียดเพิ่มเติม -->
+      <div style="margin-bottom:20px">
+        <label>หมายเหตุ (ถ้ามี)</label>
+        <textarea id="submit-note" placeholder="รายละเอียดเพิ่มเติม..."></textarea>
+      </div>
+
+      <!-- Dynamic company/project form -->
+      <div style="border-top:1px solid #e2e8f0;padding-top:20px;margin-top:4px">
+        <div style="font-weight:700;color:#134e4a;margin-bottom:16px;font-size:15px">🏢 บริษัทและโครงการ</div>
+        <div id="company-container"></div>
+        <button class="add-company-btn" onclick="addCompany()">🏢 + เพิ่มบริษัท</button>
+      </div>
+
+      <!-- Submit button -->
+      <div style="display:flex;justify-content:flex-end;margin-top:8px">
+        <button class="btn btn-primary" style="padding:12px 32px;font-size:15px" onclick="submitWork()" id="btn-submit">
+          📤 ส่งงาน
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== TAB 1: ติดตามสถานะ ===== -->
+  <div class="tab-content" id="tab-1">
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title">📊 สถานะ Lot ของคุณ</div>
+        <button class="btn btn-outline btn-sm" onclick="loadMyLots()">🔄 รีเฟรช</button>
+      </div>
+      <div id="my-lots-wrap">
+        <div class="empty"><div class="loading-spinner"></div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== TAB 2: แนบสลิป ===== -->
+  <div class="tab-content" id="tab-2">
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title">🧾 แนบสลิปการชำระเงิน</div>
+      </div>
+      <div style="margin-bottom:20px">
+        <label>เลือก Lot</label>
+        <select id="slip-lot-select" onchange="loadSlipStatus()">
+          <option value="">-- เลือก Lot --</option>
+        </select>
+      </div>
+      <div id="slip-status"></div>
+    </div>
+  </div>
+
+</div><!-- end main -->
+
+<div class="toast" id="toast"></div>
+
+<script>
+const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+let currentUser = null;
+let myLots = [];
+let coCount = 0;
+let projCounts = {};
+
+// ===== INIT =====
+(async () => {
+  const { data: { session } } = await sb.auth.getSession();
+  if (!session) { window.location.href = 'index.html'; return; }
+  currentUser = session.user;
+
+  // ตรวจสอบ role
+  const { data: role } = await sb.from('user_roles').select('role').eq('user_id', currentUser.id).single();
+  if (role?.role === 'admin') { window.location.href = 'admin.html'; return; }
+
+  document.getElementById('cust-email').textContent = currentUser.email;
+  await loadMyLots();
+  populateSlipSelect();
+
+  // เพิ่มบริษัทแรกอัตโนมัติ
+  addCompany();
+})();
+
+async function logout() {
+  await sb.auth.signOut();
+  window.location.href = 'index.html';
+}
+
+// ===== TABS =====
+function switchTab(i) {
+  document.querySelectorAll('.tab-nav button').forEach((b, j) => b.classList.toggle('active', i === j));
+  document.querySelectorAll('.tab-content').forEach((c, j) => c.classList.toggle('active', i === j));
+  if (i === 1) loadMyLots();
+  if (i === 2) populateSlipSelect();
+}
+
+function showToast(msg, ms = 3000) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.style.display = 'block';
+  setTimeout(() => t.style.display = 'none', ms);
+}
+
+// ===== LOAD LOTS =====
+async function loadMyLots() {
+  const wrap = document.getElementById('my-lots-wrap');
+  const { data } = await sb.from('lots').select('*').eq('customer_id', currentUser.id).order('created_at', { ascending: false });
+  myLots = data || [];
+
+  // Populate submit lot select
+  const sel = document.getElementById('submit-lot-select');
+  sel.innerHTML = '<option value="">-- เลือก Lot --</option>';
+  myLots.forEach(l => {
+    const o = document.createElement('option');
+    o.value = l.id;
+    o.textContent = `${l.lot_number}${l.description ? ' — ' + l.description : ''}`;
+    sel.appendChild(o);
+  });
+
+  if (!myLots.length) {
+    wrap.innerHTML = '<div class="empty"><div class="empty-icon">📊</div><p>ยังไม่มี Lot ที่ถูกมอบหมาย<br><small>ติดต่อ Admin เพื่อสร้าง Lot</small></p></div>';
+    return;
+  }
+
+  const statusLabel = { pending: '⏳ รอดำเนินการ', docs: '📄 รอเอกสาร', paid: '✅ ชำระแล้ว' };
+  const html = myLots.map(l => `
+    <div class="lot-card">
+      <div class="lot-card-header">
+        <div>
+          <div class="lot-number">📁 ${l.lot_number}</div>
+          <div class="lot-meta">${fmtDate(l.created_at)}</div>
+        </div>
+        <span class="badge badge-${l.status}">${statusLabel[l.status] || l.status}</span>
+      </div>
+      ${l.description ? `<p style="font-size:13px;color:#64748b;margin-bottom:10px">${l.description}</p>` : ''}
+      ${l.confirmed_total != null
+        ? `<div style="background:#f0fdf4;border-radius:8px;padding:10px;font-size:13px">
+             <span style="color:#64748b">ยอดที่ยืนยัน:</span>
+             <strong style="color:#0f766e"> ${fmt(l.confirmed_total)} ฿</strong>
+           </div>`
+        : ''}
+    </div>
+  `).join('');
+
+  wrap.innerHTML = html;
+}
+
+// ===== DYNAMIC COMPANY/PROJECT FORM =====
+function addCompany() {
+  coCount++;
+  const n = coCount;
+  projCounts[n] = 0;
+  const container = document.getElementById('company-container');
+  const div = document.createElement('div');
+  div.className = 'co-section';
+  div.id = 'co-block-' + n;
+  div.innerHTML = `
+    <div class="co-header">
+      <div class="co-label">🏢 บริษัทที่ ${n}</div>
+      ${n > 1 ? `<button class="btn-danger" onclick="removeCompany('co-block-${n}')">✕ ลบบริษัทนี้</button>` : ''}
+    </div>
+    <div style="margin-bottom:14px">
+      <label>ชื่อบริษัท *</label>
+      <input type="text" id="co-name-${n}" placeholder="เช่น บริษัท ABC จำกัด">
+    </div>
+    <div id="proj-container-${n}"></div>
+    <button class="btn btn-ghost btn-sm" style="width:100%;margin-top:4px" onclick="addProject(${n})">
+      + เพิ่มโครงการในบริษัทนี้
+    </button>
+  `;
+  container.appendChild(div);
+  addProject(n);  // เพิ่มโครงการแรกอัตโนมัติ
+  if (n > 1) div.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+function makeProjectBlock(num, coNum) {
+  return `
+    <div class="proj-block" id="proj-block-${coNum}-${num}">
+      <div class="proj-block-header">
+        <span>โครงการที่ ${num}</span>
+        ${num > 1 ? `<button class="btn-danger" onclick="removeProject('proj-block-${coNum}-${num}')">✕</button>` : ''}
+      </div>
+      <div class="input-row" style="grid-template-columns:1fr 160px;gap:10px">
+        <div>
+          <label>ชื่อโครงการ *</label>
+          <input type="text" id="proj-name-${coNum}-${num}" placeholder="เช่น โครงการ XYZ">
+        </div>
+        <div>
+          <label>มูลค่า (บาท) *</label>
+          <input type="number" id="proj-amount-${coNum}-${num}" placeholder="0.00" step="0.01" min="0">
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function addProject(coNum) {
+  projCounts[coNum] = (projCounts[coNum] || 0) + 1;
+  const n = projCounts[coNum];
+  const container = document.getElementById('proj-container-' + coNum);
+  container.insertAdjacentHTML('beforeend', makeProjectBlock(n, coNum));
+}
+
+function removeCompany(id) { document.getElementById(id)?.remove(); }
+function removeProject(id) { document.getElementById(id)?.remove(); }
+
+// ===== SUBMIT WORK =====
+async function submitWork() {
+  const lotId = document.getElementById('submit-lot-select').value;
+  if (!lotId) { alert('กรุณาเลือก Lot ก่อน'); return; }
+
+  // เก็บข้อมูลบริษัทและโครงการ
+  const coBlocks = document.querySelectorAll('.co-section');
+  if (!coBlocks.length) { alert('กรุณาเพิ่มบริษัทอย่างน้อย 1 บริษัท'); return; }
+
+  const companiesData = [];
+  let valid = true;
+
+  coBlocks.forEach(coBlock => {
+    const coId = coBlock.id.replace('co-block-', '');
+    const coName = document.getElementById('co-name-' + coId)?.value.trim();
+    if (!coName) { alert('กรุณากรอกชื่อบริษัทให้ครบ'); valid = false; return; }
+
+    const projBlocks = coBlock.querySelectorAll('.proj-block');
+    const projects = [];
+    projBlocks.forEach(pb => {
+      const parts = pb.id.split('-');
+      const pNum = parts[parts.length - 1];
+      const pCo  = parts[parts.length - 2];
+      const pName   = document.getElementById(`proj-name-${pCo}-${pNum}`)?.value.trim();
+      const pAmount = parseFloat(document.getElementById(`proj-amount-${pCo}-${pNum}`)?.value || '0');
+      if (!pName) { alert('กรุณากรอกชื่อโครงการให้ครบ'); valid = false; return; }
+      if (isNaN(pAmount) || pAmount < 0) { alert('กรุณากรอกมูลค่าโครงการให้ถูกต้อง'); valid = false; return; }
+      projects.push({ name: pName, amount: pAmount });
+    });
+
+    if (projects.length === 0) { alert('บริษัท ' + coName + ' ต้องมีอย่างน้อย 1 โครงการ'); valid = false; return; }
+    companiesData.push({ name: coName, projects });
+  });
+
+  if (!valid) return;
+
+  const btn = document.getElementById('btn-submit');
+  btn.disabled = true;
+  btn.innerHTML = '<span style="display:inline-block;width:14px;height:14px;border:2px solid rgba(255,255,255,.4);border-top-color:white;border-radius:50%;animation:spin .6s linear infinite;margin-right:8px"></span> กำลังส่ง...';
+
+  try {
+    for (const co of companiesData) {
+      // Insert company
+      const { data: coData, error: coErr } = await sb.from('companies')
+        .insert({ lot_id: lotId, name: co.name })
+        .select().single();
+
+      if (coErr) throw coErr;
+
+      // Insert projects
+      const projInserts = co.projects.map(p => ({
+        company_id: coData.id,
+        lot_id: lotId,
+        name: p.name,
+        amount: p.amount
+      }));
+
+      const { error: projErr } = await sb.from('projects').insert(projInserts);
+      if (projErr) throw projErr;
+    }
+
+    // อัปเดต status ของ lot เป็น 'docs'
+    await sb.from('lots').update({ status: 'docs' }).eq('id', lotId);
+
+    showToast('✅ ส่งงานเรียบร้อยแล้ว!');
+    btn.disabled = false;
+    btn.textContent = '📤 ส่งงาน';
+
+    // Reset form
+    coCount = 0;
+    projCounts = {};
+    document.getElementById('company-container').innerHTML = '';
+    document.getElementById('submit-note').value = '';
+    addCompany();
+
+    // ไปหน้าติดตาม
+    switchTab(1);
+
+  } catch (err) {
+    alert('เกิดข้อผิดพลาด: ' + err.message);
+    btn.disabled = false;
+    btn.textContent = '📤 ส่งงาน';
+  }
+}
+
+// ===== SLIP TAB =====
+function populateSlipSelect() {
+  const sel = document.getElementById('slip-lot-select');
+  const current = sel.value;
+  sel.innerHTML = '<option value="">-- เลือก Lot --</option>';
+  myLots.forEach(l => {
+    const o = document.createElement('option');
+    o.value = l.id;
+    o.textContent = `${l.lot_number}`;
+    if (l.id === current) o.selected = true;
+    sel.appendChild(o);
+  });
+}
+
+async function loadSlipStatus() {
+  const lotId = document.getElementById('slip-lot-select').value;
+  const div = document.getElementById('slip-status');
+  if (!lotId) { div.innerHTML = ''; return; }
+
+  div.innerHTML = '<div class="empty"><div class="loading-spinner"></div></div>';
+
+  const { data: payments } = await sb.from('payments').select('*').eq('lot_id', lotId).order('created_at', { ascending: false });
+
+  const lot = myLots.find(l => l.id === lotId);
+  let html = `<div style="margin-bottom:16px;padding:12px;background:#f8fafc;border-radius:10px;font-size:13px">
+    <strong>${lot?.lot_number}</strong> — สถานะ: <span class="badge badge-${lot?.status}">${lot?.status}</span>
+  </div>`;
+
+  if (payments?.length) {
+    html += '<div style="font-weight:700;margin-bottom:10px;color:#134e4a">สลิปที่แนบไว้</div>';
+    payments.forEach(p => {
+      html += `<div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:14px;margin-bottom:10px">
+        <div style="font-size:13px;color:#64748b">อัปโหลด: ${fmtDate(p.slip_uploaded_at || p.created_at)}</div>
+        ${p.slip_url
+          ? `<div style="margin:8px 0"><a href="${p.slip_url}" target="_blank" style="color:#0f766e;font-weight:600">📎 ดูสลิป</a></div>`
+          : '<div style="color:#94a3b8;margin:8px 0">ยังไม่มีไฟล์สลิป</div>'}
+        <div>${p.confirmed_by_admin
+          ? `<span class="badge badge-paid">✅ Admin ยืนยันแล้ว</span>`
+          : `<span class="badge badge-pending">⏳ รอ Admin ยืนยัน</span>`}</div>
+      </div>`;
+    });
+  }
+
+  // Upload form
+  html += `
+    <div style="margin-top:16px">
+      <label style="margin-bottom:10px;display:block;font-weight:700;color:#134e4a">📎 แนบสลิปใหม่</label>
+      <div class="upload-zone" onclick="document.getElementById('slip-file').click()">
+        <div style="font-size:28px;margin-bottom:6px">📎</div>
+        <div style="font-weight:600">คลิกเพื่อเลือกไฟล์สลิป</div>
+        <div style="font-size:12px;color:#94a3b8;margin-top:4px">JPG, PNG, PDF (ไม่เกิน 10MB)</div>
+        <input type="file" id="slip-file" accept="image/*,.pdf" onchange="handleFileSelect(this)">
+      </div>
+      <div id="file-preview" style="display:none;margin-top:10px;padding:10px;background:#f0fdf4;border-radius:8px;font-size:13px"></div>
+      <div style="margin-top:12px">
+        <label>หมายเหตุ (ถ้ามี)</label>
+        <input type="text" id="slip-note" placeholder="เช่น โอน 3 เม.ย. 10:30 น.">
+      </div>
+      <button class="btn btn-primary" style="margin-top:12px;width:100%" onclick="uploadSlip('${lotId}')" id="btn-upload">
+        📤 ส่งสลิป
+      </button>
+    </div>`;
+
+  div.innerHTML = html;
+}
+
+function handleFileSelect(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const preview = document.getElementById('file-preview');
+  preview.style.display = 'block';
+  preview.innerHTML = `📎 ไฟล์: <strong>${file.name}</strong> (${(file.size / 1024).toFixed(1)} KB)`;
+}
+
+async function uploadSlip(lotId) {
+  const fileInput = document.getElementById('slip-file');
+  const note = document.getElementById('slip-note')?.value.trim();
+  const file = fileInput?.files[0];
+
+  if (!file) { alert('กรุณาเลือกไฟล์สลิปก่อน'); return; }
+  if (file.size > 10 * 1024 * 1024) { alert('ไฟล์ต้องไม่เกิน 10MB'); return; }
+
+  const btn = document.getElementById('btn-upload');
+  btn.disabled = true;
+  btn.textContent = '⏳ กำลังอัปโหลด...';
+
+  try {
+    // Upload to Supabase Storage
+    const ext = file.name.split('.').pop();
+    const path = `${currentUser.id}/${lotId}/${Date.now()}.${ext}`;
+
+    const { data: uploadData, error: uploadErr } = await sb.storage
+      .from('slips')
+      .upload(path, file, { upsert: true });
+
+    if (uploadErr) throw uploadErr;
+
+    // Get public URL (signed URL for private bucket)
+    const { data: urlData } = await sb.storage.from('slips').createSignedUrl(path, 60 * 60 * 24 * 7); // 7 days
+
+    const slipUrl = urlData?.signedUrl || '';
+
+    // Insert payment record
+    const { error: payErr } = await sb.from('payments').insert({
+      lot_id: lotId,
+      submitted_by: currentUser.id,
+      slip_url: slipUrl,
+      slip_uploaded_at: new Date().toISOString(),
+      note: note || null
+    });
+
+    if (payErr) throw payErr;
+
+    showToast('✅ ส่งสลิปเรียบร้อยแล้ว!');
+    btn.disabled = false;
+    btn.textContent = '📤 ส่งสลิป';
+    loadSlipStatus();
+
+  } catch (err) {
+    alert('เกิดข้อผิดพลาด: ' + err.message);
+    btn.disabled = false;
+    btn.textContent = '📤 ส่งสลิป';
+  }
+}
+
+// ===== HELPERS =====
+function fmt(n) {
+  return parseFloat(n || 0).toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+function fmtDate(d) {
+  if (!d) return '-';
+  return new Date(d).toLocaleDateString('th-TH', { year: 'numeric', month: 'short', day: 'numeric' });
+}
+</script>
+</body>
+</html>
