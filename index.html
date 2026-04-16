@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BillFlow — เข้าสู่ระบบ</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="config.js"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Segoe UI', Tahoma, sans-serif;
+    background: linear-gradient(135deg, #0f766e 0%, #134e4a 100%);
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+  }
+  .card {
+    background: white;
+    border-radius: 16px;
+    padding: 40px;
+    width: 100%;
+    max-width: 420px;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.2);
+  }
+  .logo {
+    text-align: center;
+    margin-bottom: 32px;
+  }
+  .logo-icon {
+    width: 64px; height: 64px;
+    background: linear-gradient(135deg, #0f766e, #14b8a6);
+    border-radius: 16px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 28px;
+    margin-bottom: 12px;
+  }
+  .logo h1 { font-size: 24px; color: #134e4a; font-weight: 700; }
+  .logo p  { font-size: 14px; color: #64748b; margin-top: 4px; }
+  .divider {
+    display: flex; align-items: center; gap: 12px;
+    margin: 24px 0; color: #94a3b8; font-size: 13px;
+  }
+  .divider::before, .divider::after {
+    content: ''; flex: 1; height: 1px; background: #e2e8f0;
+  }
+  .btn {
+    width: 100%; padding: 12px;
+    border: none; border-radius: 10px;
+    font-size: 15px; font-weight: 600;
+    cursor: pointer; transition: all .2s;
+    display: flex; align-items: center; justify-content: center; gap: 10px;
+  }
+  .btn-google {
+    background: white; color: #374151;
+    border: 1.5px solid #d1d5db;
+  }
+  .btn-google:hover { background: #f9fafb; border-color: #9ca3af; }
+  .btn-primary {
+    background: linear-gradient(135deg, #0f766e, #14b8a6);
+    color: white; margin-top: 8px;
+  }
+  .btn-primary:hover { opacity: .9; transform: translateY(-1px); }
+  .btn:disabled { opacity: .5; cursor: not-allowed; transform: none !important; }
+  label { display: block; font-size: 13px; font-weight: 600; color: #374151; margin-bottom: 6px; }
+  input {
+    width: 100%; padding: 11px 14px;
+    border: 1.5px solid #d1d5db; border-radius: 8px;
+    font-size: 14px; color: #1e293b;
+    transition: border-color .2s;
+    margin-bottom: 16px;
+  }
+  input:focus { outline: none; border-color: #14b8a6; }
+  .msg {
+    padding: 10px 14px; border-radius: 8px;
+    font-size: 13px; margin-bottom: 16px; display: none;
+  }
+  .msg.error   { background: #fef2f2; color: #dc2626; border: 1px solid #fecaca; display: block; }
+  .msg.success { background: #f0fdf4; color: #16a34a; border: 1px solid #bbf7d0; display: block; }
+  .tabs { display: flex; gap: 4px; background: #f1f5f9; padding: 4px; border-radius: 10px; margin-bottom: 24px; }
+  .tab-btn {
+    flex: 1; padding: 8px; border: none; background: none;
+    border-radius: 8px; font-size: 13px; font-weight: 600;
+    cursor: pointer; color: #64748b; transition: all .2s;
+  }
+  .tab-btn.active { background: white; color: #0f766e; box-shadow: 0 1px 4px rgba(0,0,0,.1); }
+  .tab-panel { display: none; }
+  .tab-panel.active { display: block; }
+  .loading { display: inline-block; width: 16px; height: 16px; border: 2px solid rgba(255,255,255,.4); border-top-color: white; border-radius: 50%; animation: spin .6s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="logo">
+    <div class="logo-icon">📋</div>
+    <h1>BillFlow</h1>
+    <p>ระบบส่งงานและติดตามบิล</p>
+  </div>
+
+  <div id="msg" class="msg"></div>
+
+  <!-- Google Login -->
+  <button class="btn btn-google" onclick="loginGoogle()" id="btn-google">
+    <svg width="18" height="18" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
+    เข้าสู่ระบบด้วย Google
+  </button>
+
+  <div class="divider">หรือ</div>
+
+  <!-- Email/Password Tabs -->
+  <div class="tabs">
+    <button class="tab-btn active" onclick="switchTab('login')">เข้าสู่ระบบ</button>
+    <button class="tab-btn" onclick="switchTab('register')">สมัครสมาชิก</button>
+  </div>
+
+  <!-- Login Panel -->
+  <div class="tab-panel active" id="panel-login">
+    <label>อีเมล</label>
+    <input type="email" id="login-email" placeholder="example@email.com">
+    <label>รหัสผ่าน</label>
+    <input type="password" id="login-password" placeholder="รหัสผ่าน" onkeypress="if(event.key==='Enter') loginEmail()">
+    <button class="btn btn-primary" onclick="loginEmail()" id="btn-login">
+      เข้าสู่ระบบ
+    </button>
+  </div>
+
+  <!-- Register Panel -->
+  <div class="tab-panel" id="panel-register">
+    <label>อีเมล</label>
+    <input type="email" id="reg-email" placeholder="example@email.com">
+    <label>รหัสผ่าน (อย่างน้อย 6 ตัวอักษร)</label>
+    <input type="password" id="reg-password" placeholder="รหัสผ่าน">
+    <label>ยืนยันรหัสผ่าน</label>
+    <input type="password" id="reg-confirm" placeholder="ยืนยันรหัสผ่าน" onkeypress="if(event.key==='Enter') register()">
+    <button class="btn btn-primary" onclick="register()" id="btn-register">
+      สมัครสมาชิก
+    </button>
+  </div>
+</div>
+
+<script>
+const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+// ตรวจสอบ session เดิม
+(async () => {
+  const { data: { session } } = await supabase.auth.getSession();
+  if (session) await redirectByRole(session.user);
+})();
+
+// Handle OAuth callback
+supabase.auth.onAuthStateChange(async (event, session) => {
+  if (event === 'SIGNED_IN' && session) {
+    await redirectByRole(session.user);
+  }
+});
+
+function showMsg(text, type = 'error') {
+  const el = document.getElementById('msg');
+  el.textContent = text;
+  el.className = 'msg ' + type;
+}
+
+function hideMsg() {
+  document.getElementById('msg').className = 'msg';
+}
+
+function switchTab(tab) {
+  document.querySelectorAll('.tab-btn').forEach((b, i) => {
+    b.classList.toggle('active', (i === 0) === (tab === 'login'));
+  });
+  document.getElementById('panel-login').classList.toggle('active', tab === 'login');
+  document.getElementById('panel-register').classList.toggle('active', tab === 'register');
+  hideMsg();
+}
+
+async function redirectByRole(user) {
+  const { data, error } = await supabase
+    .from('user_roles')
+    .select('role')
+    .eq('user_id', user.id)
+    .single();
+
+  if (data?.role === 'admin') {
+    window.location.href = 'admin.html';
+  } else {
+    window.location.href = 'customer.html';
+  }
+}
+
+async function loginGoogle() {
+  const btn = document.getElementById('btn-google');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="loading"></span> กำลังเชื่อมต่อ...';
+
+  const { error } = await supabase.auth.signInWithOAuth({
+    provider: 'google',
+    options: {
+      redirectTo: window.location.href
+    }
+  });
+
+  if (error) {
+    showMsg('เกิดข้อผิดพลาด: ' + error.message);
+    btn.disabled = false;
+    btn.innerHTML = `<svg width="18" height="18" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg> เข้าสู่ระบบด้วย Google`;
+  }
+}
+
+async function loginEmail() {
+  const email = document.getElementById('login-email').value.trim();
+  const password = document.getElementById('login-password').value;
+  if (!email || !password) { showMsg('กรุณากรอกอีเมลและรหัสผ่าน'); return; }
+
+  const btn = document.getElementById('btn-login');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="loading"></span> กำลังเข้าสู่ระบบ...';
+  hideMsg();
+
+  const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+
+  if (error) {
+    showMsg('อีเมลหรือรหัสผ่านไม่ถูกต้อง');
+    btn.disabled = false;
+    btn.textContent = 'เข้าสู่ระบบ';
+    return;
+  }
+  await redirectByRole(data.user);
+}
+
+async function register() {
+  const email    = document.getElementById('reg-email').value.trim();
+  const password = document.getElementById('reg-password').value;
+  const confirm  = document.getElementById('reg-confirm').value;
+
+  if (!email || !password) { showMsg('กรุณากรอกข้อมูลให้ครบ'); return; }
+  if (password !== confirm) { showMsg('รหัสผ่านไม่ตรงกัน'); return; }
+  if (password.length < 6)  { showMsg('รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร'); return; }
+
+  const btn = document.getElementById('btn-register');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="loading"></span> กำลังสมัคร...';
+  hideMsg();
+
+  const { data, error } = await supabase.auth.signUp({
+    email, password,
+    options: { emailRedirectTo: window.location.href }
+  });
+
+  if (error) {
+    showMsg('เกิดข้อผิดพลาด: ' + error.message);
+    btn.disabled = false;
+    btn.textContent = 'สมัครสมาชิก';
+    return;
+  }
+
+  if (data.user && !data.session) {
+    showMsg('ส่งอีเมลยืนยันแล้ว — กรุณาเช็ค inbox ของคุณ', 'success');
+    btn.disabled = false;
+    btn.textContent = 'สมัครสมาชิก';
+  } else if (data.session) {
+    await redirectByRole(data.user);
+  }
+}
+</script>
+</body>
+</html>
